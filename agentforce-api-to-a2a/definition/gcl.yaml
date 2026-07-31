@@ -54,16 +54,20 @@ spec:
         with the Client Credentials Flow.
     consumerSecret:
       type: string
-      format: password
       description: External Connected App consumer secret (OAuth client_secret).
+      "@context":
+        "@characteristics":
+          - "security:sensitive"
     agentforceAccessTokenOverride:
       type: string
-      format: password
       default: ""
       description: |
         Optional diagnostic override. When set, the policy skips the
         Salesforce OAuth client_credentials exchange and uses this bearer
         token for Agentforce calls. Leave blank for normal operation.
+      "@context":
+        "@characteristics":
+          - "security:sensitive"
     agentId:
       type: string
       description: |
@@ -314,11 +318,13 @@ spec:
         true.
     anypointClientSecret:
       type: string
-      format: password
       default: ""
       description: |
         Connected-app client_secret matching `anypointClientId`. Required
         when `publishAgentCardToExchange` is true.
+      "@context":
+        "@characteristics":
+          - "security:sensitive"
     anypointOrgId:
       type: string
       default: ""

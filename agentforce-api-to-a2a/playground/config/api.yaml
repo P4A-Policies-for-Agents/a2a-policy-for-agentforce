@@ -26,8 +26,8 @@ spec:
       config:
         myDomainUrl: https://storm-7b591fd6a36b2a.my.salesforce.com
         agentforceApiUrl: https://api.salesforce.com/einstein/ai-agent/v1
-        consumerKey: 3MVG9HB6vm3GZZR85KUaAZMhWxBT4ZyoijT31.4iCgOgR.1DTfqVSMv3Hq4vWXhUEjAiuOaSl0hKX7M4QXhAQ
-        consumerSecret: B050E64A1B96572AD4E2B8B886E310B5DB3B575C2B40E3D46142123B2306EEA2
+        consumerKey: "****"
+        consumerSecret: "****"
         agentId: 0XxHs000000viExKAI
         bypassUser: true
         cacheSafetyMarginSeconds: 60
@@ -40,8 +40,8 @@ spec:
 
         objectStoreBaseUrl: https://object-store-us-east-1.anypoint.mulesoft.com
         anypointTokenUrl: https://anypoint.mulesoft.com/accounts/api/v2/oauth2/token
-        anypointClientId: 0ced7c22c8da494c9f0b51f799f22e1f
-        anypointClientSecret: 08834EE58C7746a5aEae17A99ff60587
+        anypointClientId: "****"
+        anypointClientSecret: "****"
         anypointOrgId: f684513f-280e-403a-ac53-80ca62e3de49
         anypointEnvId: 8c937036-f4d8-4405-a203-dd1e2b440ead
         objectStoreId: agentforce-a2a-tasks

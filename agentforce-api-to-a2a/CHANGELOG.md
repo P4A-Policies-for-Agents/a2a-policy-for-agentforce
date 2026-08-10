@@ -39,4 +39,10 @@ heading is renamed to the version and dated (e.g. `## [1.1.0] - 2026-08-09`).
   (`agentCardName`, `agentCardDescription`, `agentCardSkillsJson`) so the published AgentCard
   describes their own Agentforce agent.
 
+### Security
+
+- Replaced the hardcoded example credentials in `playground/config/api.yaml` (`consumerKey`,
+  `consumerSecret`, `anypointClientId`, `anypointClientSecret`) with `****` placeholders so
+  no credentials are committed to the repository.
+
 [Unreleased]: https://github.com/P4A-Policies-for-Agents/a2a-policy-for-agentforce/commits/main

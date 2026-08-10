@@ -32,6 +32,21 @@ for the underlying issue.
 
 Step-by-step. Skip steps you already have set up.
 
+> **Before you build or deploy, update the configuration with your own values.**
+> The config ships with placeholder Salesforce and Anypoint values (My Domain URL,
+> consumer key/secret, agent id, Anypoint credentials, Object Store settings) that
+> will not work against your org until you replace them:
+> - **Local smoke test (step 6):** edit `playground/config/api.yaml`.
+> - **Anypoint deployment (step 8):** edit the `policy-config.json` you apply in
+>   API Manager.
+>
+> Also update the agent card fields — `agentCardName`, `agentCardDescription`, and the
+> `agentCardSkillsJson` skills — so the published AgentCard describes *your* Agentforce
+> agent rather than the example "Sales and Distribution Agent". These are what A2A
+> clients see at `/.well-known/agent-card.json`.
+>
+> Do this before running `make build` / `make run` and before applying the policy.
+
 ### Prerequisites
 
 - A Salesforce org with **Agentforce** enabled, including at least one agent and an

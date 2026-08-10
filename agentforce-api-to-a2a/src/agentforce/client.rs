@@ -15,6 +15,7 @@
 //! before surfacing `ClientError::AuthRejected`.
 
 use std::rc::Rc;
+use std::time::Duration;
 
 use pdk::hl::{HttpClient, Service};
 use pdk::logger;
@@ -144,6 +145,11 @@ pub struct AgentforceClient {
     my_domain_url_value: String,
     agent_id: String,
     bypass_user: bool,
+    /// Per-call HTTP timeout applied to every outbound Agentforce dispatch.
+    /// Sourced from the operator-configurable `agentforceRequestTimeoutSeconds`
+    /// (clamped to 1..=290, default 180). The PDK HTTP client defaults to only
+    /// 10s, which is too low for long RAG turns and surfaces as a spurious 504.
+    request_timeout_secs: u64,
 }
 
 impl AgentforceClient {
@@ -154,6 +160,7 @@ impl AgentforceClient {
         my_domain_url_value: String,
         agent_id: String,
         bypass_user: bool,
+        request_timeout_secs: u32,
     ) -> Self {
         Self {
             auth,
@@ -162,6 +169,7 @@ impl AgentforceClient {
             my_domain_url_value,
             agent_id,
             bypass_user,
+            request_timeout_secs: request_timeout_secs as u64,
         }
     }
 
@@ -244,6 +252,7 @@ impl AgentforceClient {
                 ("accept", "application/json"),
             ])
             .body(body)
+            .timeout(Duration::from_secs(self.request_timeout_secs))
             .post()
             .await
             .map_err(|e| ClientError::Transport {
@@ -326,6 +335,7 @@ impl AgentforceClient {
                 ("accept", "application/json"),
             ])
             .body(body)
+            .timeout(Duration::from_secs(self.request_timeout_secs))
             .post()
             .await
             .map_err(|e| ClientError::Transport {
@@ -385,6 +395,7 @@ impl AgentforceClient {
             .request(self.api.as_ref())
             .path(path)
             .headers(vec![("authorization", bearer.as_str())])
+            .timeout(Duration::from_secs(self.request_timeout_secs))
             .delete()
             .await
             .map_err(|e| ClientError::Transport {

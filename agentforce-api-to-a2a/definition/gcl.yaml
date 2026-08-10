@@ -87,6 +87,34 @@ spec:
       maximum: 600
       default: 60
       description: Refresh the OAuth access token this many seconds before expires_in.
+    agentforceRequestTimeoutSeconds:
+      type: integer
+      minimum: 1
+      maximum: 290
+      default: 180
+      description: |
+        Per-call HTTP timeout (seconds) for every outbound Agentforce REST
+        call (OAuth token, startSession, sendMessage, endSession). Must exceed
+        the agent's worst-case turn time. The underlying PDK HTTP client
+        defaults to only 10s, which is too low for long RAG turns and surfaces
+        as a spurious HTTP 504; this value overrides that default.
+
+        Ceiling (maximum: 290): capped ~10s below the gateway's 300s upstream
+        response timeout so the policy's own timeout fires FIRST, giving the
+        client a clean JSON-RPC error (-32603 with data.reason) instead of a
+        bare gateway 504 with no diagnostic detail. It also prevents two
+        footguns: (1) an unbounded value pinning a gateway worker on a
+        genuinely hung upstream instead of failing fast, and (2) a value above
+        the gateway timeout, which would be dead code because the gateway
+        always wins. If your team raises the gateway's upstream response
+        timeout above 300s, this ceiling can be raised to (gateway_timeout -
+        10s) to match.
+
+        Note: the gateway's connection-idle timeout (typically 60s) can still
+        drop a synchronous turn that runs longer than that regardless of this
+        value, because no interim bytes flow during a sync agent turn. Raising
+        this field past 60s only fully pays off if the idle timeout is raised
+        too. The durable fix for very long turns is the streaming endpoint.
 
     # ---------------------------------------------------------------------
     # A2A protocol

@@ -338,6 +338,7 @@ mod tests {
             agent_id: "a".into(),
             bypass_user: true,
             cache_safety_margin_seconds: 60,
+            agentforce_request_timeout_seconds: 180,
             protocol_version: ProtocolVersion::V0_3_0,
             a2a_rpc_path: "/".into(),
             public_base_url: "https://gw.example.com/a2a".into(),

@@ -282,6 +282,7 @@ Save your real values into `policy-config.json`:
   "agentId": "<0Xx-agent-id>",
   "bypassUser": true,
   "cacheSafetyMarginSeconds": 60,
+  "agentforceRequestTimeoutSeconds": 180,
 
   "protocolVersion": "0.3.0",
   "a2aRpcPath": "/a2a/v1/rpc",
@@ -585,7 +586,8 @@ If any test returns an unexpected response, the body usually tells you which sub
 | `404` empty body, no `content-type`, with `x-envoy-decorator-operation` | Connected-mode WASM trap. Confirm the gateway is on the release build and the policy includes the on-response refactor; see [`ROADMAP.md`](ROADMAP.md) #1 / #3. |
 | `200` `-32603 InternalError` with `data.reason = agentforce_auth_rejected` | Salesforce credentials wrong / expired / not authorized for this agent. |
 | `200` `-32603` with `data.reason = agentforce_http_error` and `status: 4xx` | Agentforce API rejected the request. Check `agentId`, the agent's user assignment, and `bypassUser`. |
-| `200` `-32603` with `data.reason = agentforce_transport_error` | Network reachability from the gateway to `api.salesforce.com` is broken. |
+| `200` `-32603` with `data.reason = agentforce_transport_error` | Either network reachability from the gateway to `api.salesforce.com` is broken, **or** the agent turn exceeded `agentforceRequestTimeoutSeconds` (default 180s) and the policy's own HTTP timeout fired. For a slow agent, raise the field (max 290). |
+| Bare `504` with no `data.reason`, after ~300s | The gateway's upstream response timeout fired before the policy — `agentforceRequestTimeoutSeconds` is set at/above the gateway timeout. Lower it below the gateway ceiling (max 290). A bare `504` after ~60s instead points at the gateway's connection-idle timeout, which no policy setting can override for a synchronous turn. |
 
 #### Notes
 

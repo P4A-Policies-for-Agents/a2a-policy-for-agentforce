@@ -63,6 +63,8 @@ pub struct Config {
         deserialize_with = "pdk::serde::deserialize_service"
     )]
     pub agentforce_api_url: pdk::hl::Service,
+    #[serde(alias = "agentforceRequestTimeoutSeconds")]
+    pub agentforce_request_timeout_seconds: Option<i64>,
     #[serde(alias = "anypointClientId")]
     pub anypoint_client_id: Option<String>,
     #[serde(alias = "anypointClientSecret")]

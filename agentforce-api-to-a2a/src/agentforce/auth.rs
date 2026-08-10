@@ -14,6 +14,7 @@
 //! reactive retry is implemented in `client::with_bearer_retry`.
 
 use std::rc::Rc;
+use std::time::Duration;
 
 use pdk::cache::Cache;
 use pdk::hl::{HttpClient, Service};
@@ -37,6 +38,9 @@ pub struct AgentforceAuthConfig {
     /// Used as the cache-key salt and in the Service host disambiguation.
     pub my_domain_url_for_cache_key: String,
     pub cache_safety_margin_seconds: u32,
+    /// Per-call HTTP timeout for the OAuth token exchange. Sourced from the
+    /// operator-configurable `agentforceRequestTimeoutSeconds` (see client.rs).
+    pub request_timeout_secs: u32,
 }
 
 #[derive(Debug, Error)]
@@ -181,6 +185,7 @@ impl AgentforceAuth {
                 ("accept", "application/json"),
             ])
             .body(body.as_bytes())
+            .timeout(Duration::from_secs(self.cfg.request_timeout_secs as u64))
             .post();
 
         let response = request.await.map_err(|e| AuthError::Transport {

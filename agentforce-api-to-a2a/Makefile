@@ -90,6 +90,13 @@ upload-docs-dev: ## Upload definition/home.md to a dev definition asset. Pass DE
 
 .PHONY: build-asset-files
 build-asset-files: $(DEFINITION_SRC_GCL_PATH)
+	@# Wipe generated asset files before regenerating. The CLI regenerates
+	@# definition/target/gcl.yaml (flat) but can leave a stale
+	@# definition/target/definition/gcl.yaml (nested) behind; the sync block
+	@# below then copies the stale nested file over the fresh flat one, so a
+	@# published asset silently ships the previous schema. Cleaning first makes
+	@# every build regenerate from definition/gcl.yaml with no stale survivors.
+	@rm -rf definition/target
 	@anypoint-cli-v4 pdk policy-project build-asset-files --metadata '$(ANYPOINT_METADATA_JSON)'
 	@if [ -d definition/target/definition ]; then \
 		cp definition/target/definition/gcl.yaml      definition/target/gcl.yaml      2>/dev/null || true; \

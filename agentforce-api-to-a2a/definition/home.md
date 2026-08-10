@@ -267,6 +267,7 @@ curl https://your-flex.example.com/agentforce-a2a/a2a/v1/rpc \
 | `agentId` | yes | — | Agentforce agent id used in `POST /agents/{id}/sessions`. |
 | `bypassUser` | no | `true` | Use the agent-assigned user (correct for `client_credentials`). |
 | `cacheSafetyMarginSeconds` | no | `60` | Refresh tokens this many seconds before `expires_in`. |
+| `agentforceRequestTimeoutSeconds` | no | `180` | Per-call HTTP timeout (s) for every outbound Agentforce call. Overrides the PDK client's 10s default, which is too low for long RAG turns and shows up as a spurious 504. Capped at `290` (10s under the gateway's 300s response timeout) so the policy times out first with a clean JSON-RPC error. |
 | `protocolVersion` | no | `0.3.0` | A2A protocol version. Only `0.3.0` is supported in v1. |
 | `a2aRpcPath` | no | `/` | Relative path under the governed API where JSON-RPC is accepted. |
 | `publicBaseUrl` | yes | — | Externally reachable base URL, written into `AgentCard.url`. |

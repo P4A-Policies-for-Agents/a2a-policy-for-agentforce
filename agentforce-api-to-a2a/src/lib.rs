@@ -136,6 +136,7 @@ impl From<&Config> for RawConfig {
             agent_id: Some(c.agent_id.clone()),
             bypass_user: c.bypass_user,
             cache_safety_margin_seconds: c.cache_safety_margin_seconds,
+            agentforce_request_timeout_seconds: c.agentforce_request_timeout_seconds,
             protocol_version: c.protocol_version.clone(),
             a2a_rpc_path: c.a_2_a_rpc_path.clone(),
             public_base_url: Some(c.public_base_url.clone()),
@@ -554,6 +555,7 @@ pub async fn configure(
             access_token_override: cfg.agentforce_access_token_override.clone(),
             my_domain_url_for_cache_key: my_domain_authority.clone(),
             cache_safety_margin_seconds: cfg.cache_safety_margin_seconds,
+            request_timeout_secs: cfg.agentforce_request_timeout_seconds,
         },
         cache.clone(),
         my_domain_service.clone(),
@@ -566,6 +568,7 @@ pub async fn configure(
         my_domain_url_value,
         cfg.agent_id.clone(),
         cfg.bypass_user,
+        cfg.agentforce_request_timeout_seconds,
     ));
 
     let task_store = Rc::new(TaskStore::new(

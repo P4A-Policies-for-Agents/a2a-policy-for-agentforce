@@ -153,6 +153,9 @@ pub struct PolicyConfig {
     pub agent_id: String,
     pub bypass_user: bool,
     pub cache_safety_margin_seconds: u32,
+    /// Per-call HTTP timeout (seconds) for outbound Agentforce REST calls.
+    /// Clamped to 1..=290, default 180. Overrides the PDK client's 10s default.
+    pub agentforce_request_timeout_seconds: u32,
 
     // A2A
     pub protocol_version: ProtocolVersion,
@@ -191,6 +194,7 @@ pub struct RawConfig {
     pub agent_id: Option<String>,
     pub bypass_user: Option<bool>,
     pub cache_safety_margin_seconds: Option<i64>,
+    pub agentforce_request_timeout_seconds: Option<i64>,
 
     pub protocol_version: Option<String>,
     pub a2a_rpc_path: Option<String>,
@@ -257,6 +261,8 @@ impl PolicyConfig {
         let strict_mode = raw.strict_mode.unwrap_or(false);
         let bypass_user = raw.bypass_user.unwrap_or(true);
         let cache_safety_margin_seconds = clamp_u32(raw.cache_safety_margin_seconds, 0, 600, 60);
+        let agentforce_request_timeout_seconds =
+            clamp_u32(raw.agentforce_request_timeout_seconds, 1, 290, 180);
         let task_hot_cache_ttl_seconds = clamp_u32(raw.task_hot_cache_ttl_seconds, 0, 3600, 60);
 
         // Validate the source-specific inputs and parse the structured card
@@ -329,6 +335,7 @@ impl PolicyConfig {
             agent_id,
             bypass_user,
             cache_safety_margin_seconds,
+            agentforce_request_timeout_seconds,
 
             protocol_version,
             a2a_rpc_path,
@@ -513,9 +520,47 @@ mod tests {
         assert!(!cfg.strict_mode);
         assert!(cfg.bypass_user);
         assert_eq!(cfg.cache_safety_margin_seconds, 60);
+        assert_eq!(cfg.agentforce_request_timeout_seconds, 180);
         assert_eq!(cfg.task_hot_cache_ttl_seconds, 60);
         assert_eq!(cfg.agent_card_source, AgentCardSource::Structured);
         assert_eq!(cfg.structured_card.default_input_modes, vec!["text/plain"]);
+    }
+
+    #[test]
+    fn clamps_agentforce_request_timeout() {
+        // Default when unset.
+        let cfg = PolicyConfig::from_raw(minimal()).unwrap();
+        assert_eq!(cfg.agentforce_request_timeout_seconds, 180);
+
+        // Below the floor (1s).
+        let mut raw = minimal();
+        raw.agentforce_request_timeout_seconds = Some(0);
+        assert_eq!(
+            PolicyConfig::from_raw(raw)
+                .unwrap()
+                .agentforce_request_timeout_seconds,
+            1
+        );
+
+        // Above the ceiling (290s).
+        let mut raw = minimal();
+        raw.agentforce_request_timeout_seconds = Some(9999);
+        assert_eq!(
+            PolicyConfig::from_raw(raw)
+                .unwrap()
+                .agentforce_request_timeout_seconds,
+            290
+        );
+
+        // In-range passthrough.
+        let mut raw = minimal();
+        raw.agentforce_request_timeout_seconds = Some(240);
+        assert_eq!(
+            PolicyConfig::from_raw(raw)
+                .unwrap()
+                .agentforce_request_timeout_seconds,
+            240
+        );
     }
 
     #[test]

@@ -71,11 +71,36 @@ pub enum PublishError {
 #[derive(Debug, Deserialize)]
 struct TokenResponse {
     access_token: String,
-    #[serde(default = "default_expires_in")]
+    #[serde(default = "default_expires_in", deserialize_with = "de_expires_in")]
     expires_in: u64,
 }
 fn default_expires_in() -> u64 {
     DEFAULT_EXPIRES_IN_SECS
+}
+
+/// Accept `expires_in` as a JSON number or a numeric JSON string; a blank
+/// string falls back to the default. Mirrors `agentforce::auth::de_expires_in`.
+fn de_expires_in<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumOrStr {
+        Num(u64),
+        Str(String),
+    }
+    match NumOrStr::deserialize(deserializer)? {
+        NumOrStr::Num(n) => Ok(n),
+        NumOrStr::Str(s) => {
+            let s = s.trim();
+            if s.is_empty() {
+                Ok(default_expires_in())
+            } else {
+                s.parse::<u64>().map_err(serde::de::Error::custom)
+            }
+        }
+    }
 }
 
 pub struct PublishContext<'a> {
@@ -592,6 +617,16 @@ mod tests {
         let r: TokenResponse = serde_json::from_slice(br#"{"access_token":"abc"}"#).unwrap();
         assert_eq!(r.access_token, "abc");
         assert_eq!(r.expires_in, DEFAULT_EXPIRES_IN_SECS);
+    }
+
+    #[test]
+    fn token_response_accepts_number_or_string_expires_in() {
+        let n: TokenResponse =
+            serde_json::from_slice(br#"{"access_token":"abc","expires_in":1799}"#).unwrap();
+        assert_eq!(n.expires_in, 1799);
+        let s: TokenResponse =
+            serde_json::from_slice(br#"{"access_token":"abc","expires_in":"7200"}"#).unwrap();
+        assert_eq!(s.expires_in, 7200);
     }
 
     #[test]

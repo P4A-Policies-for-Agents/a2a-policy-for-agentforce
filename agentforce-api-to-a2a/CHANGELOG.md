@@ -18,6 +18,14 @@ heading is renamed to the version and dated (e.g. `## [1.1.0] - 2026-08-09`).
 
 ### Fixed
 
+- **OAuth token exchange no longer fails when `expires_in` is a JSON string.** The Salesforce
+  token endpoint returns `"expires_in":"7200"` (a string) where it previously returned a
+  number. `TokenResponse.expires_in` is typed `u64`, so every token exchange failed
+  deserialization and every `message/send` returned `-32603` with
+  `data.reason = agentforce_token_failure` — with no error logged, because the `BadJson` path
+  is silent. `expires_in` now accepts a JSON number or a numeric string in both
+  `agentforce/auth.rs` and `exchange/publish.rs`; a blank string falls back to the
+  conservative default lifetime instead of failing the exchange.
 - **Long agent turns no longer fail with a spurious `504`.** The PDK WASM HTTP client applies
   a 10-second default timeout to any request that does not set one explicitly. Because the
   Agentforce calls never overrode it, any turn longer than ~10s (for example, multi-document

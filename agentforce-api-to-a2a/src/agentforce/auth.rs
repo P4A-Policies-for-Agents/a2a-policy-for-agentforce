@@ -66,8 +66,10 @@ pub enum AuthError {
 pub struct TokenResponse {
     pub access_token: String,
     /// Lifetime in seconds. All compliant IdPs return this; default to a
-    /// conservative 300s when missing so we never cache forever.
-    #[serde(default = "default_expires_in")]
+    /// conservative 300s when missing so we never cache forever. Salesforce
+    /// returns it as a JSON *string* (`"7200"`) while the spec allows a
+    /// number, so accept either form (see `de_expires_in`).
+    #[serde(default = "default_expires_in", deserialize_with = "de_expires_in")]
     pub expires_in: u64,
     #[serde(default)]
     #[allow(dead_code)]
@@ -79,6 +81,33 @@ pub struct TokenResponse {
 
 fn default_expires_in() -> u64 {
     DEFAULT_EXPIRES_IN_SECS
+}
+
+/// Accept `expires_in` as either a JSON number (`7200`) or a JSON string
+/// (`"7200"`). Salesforce's token endpoint returns the string form. A
+/// blank string falls back to the conservative default rather than failing
+/// the whole token exchange over a non-critical field.
+fn de_expires_in<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum NumOrStr {
+        Num(u64),
+        Str(String),
+    }
+    match NumOrStr::deserialize(deserializer)? {
+        NumOrStr::Num(n) => Ok(n),
+        NumOrStr::Str(s) => {
+            let s = s.trim();
+            if s.is_empty() {
+                Ok(default_expires_in())
+            } else {
+                s.parse::<u64>().map_err(serde::de::Error::custom)
+            }
+        }
+    }
 }
 
 /// Build the URL-encoded form body for a `client_credentials` exchange.
@@ -240,6 +269,23 @@ mod tests {
     #[test]
     fn parse_response_defaults_expires_in() {
         let body = br#"{"access_token":"x"}"#;
+        let r = parse_response(body).unwrap();
+        assert_eq!(r.expires_in, DEFAULT_EXPIRES_IN_SECS);
+    }
+
+    #[test]
+    fn parse_response_accepts_string_expires_in() {
+        // Exact shape the Salesforce token endpoint returns as of 2026-09-04:
+        // expires_in is a JSON *string*, not a number.
+        let body =
+            br#"{"access_token":"eyJ0","token_type":"Bearer","expires_in":"7200","scope":"api"}"#;
+        let r = parse_response(body).unwrap();
+        assert_eq!(r.expires_in, 7200);
+    }
+
+    #[test]
+    fn parse_response_blank_string_expires_in_falls_back_to_default() {
+        let body = br#"{"access_token":"x","expires_in":""}"#;
         let r = parse_response(body).unwrap();
         assert_eq!(r.expires_in, DEFAULT_EXPIRES_IN_SECS);
     }

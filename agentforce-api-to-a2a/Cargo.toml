@@ -1,7 +1,7 @@
 # Copyright 2026 Salesforce, Inc. All rights reserved.
 [package]
 name = "agentforce_api_to_a2a"
-version = "1.0.3"
+version = "1.0.4"
 rust-version = "1.88.0"
 edition = "2021"
 

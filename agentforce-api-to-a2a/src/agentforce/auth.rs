@@ -67,7 +67,13 @@ pub struct TokenResponse {
     pub access_token: String,
     /// Lifetime in seconds. All compliant IdPs return this; default to a
     /// conservative 300s when missing so we never cache forever.
-    #[serde(default = "default_expires_in")]
+    ///
+    /// Salesforce is inconsistent about the JSON type here: the classic
+    /// opaque-token response returns a number (`"expires_in": 7200`) while
+    /// the JWT-format token response (`"token_format": "jwt"`) returns a
+    /// quoted string (`"expires_in": "7200"`). Accept either so a valid 200
+    /// isn't rejected as malformed.
+    #[serde(default = "default_expires_in", deserialize_with = "de_u64_flexible")]
     pub expires_in: u64,
     #[serde(default)]
     #[allow(dead_code)]
@@ -79,6 +85,28 @@ pub struct TokenResponse {
 
 fn default_expires_in() -> u64 {
     DEFAULT_EXPIRES_IN_SECS
+}
+
+/// Deserialize a `u64` that may arrive as either a JSON number or a quoted
+/// numeric string. Used for `expires_in`, which Salesforce returns as a
+/// string in the JWT-format token response.
+fn de_u64_flexible<'de, D>(deserializer: D) -> Result<u64, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    use serde::de::Error;
+    match serde_json::Value::deserialize(deserializer)? {
+        serde_json::Value::Number(n) => n
+            .as_u64()
+            .ok_or_else(|| D::Error::custom(format!("expires_in out of range: {n}"))),
+        serde_json::Value::String(s) => s
+            .trim()
+            .parse::<u64>()
+            .map_err(|_| D::Error::custom(format!("expires_in not a valid integer: {s:?}"))),
+        other => Err(D::Error::custom(format!(
+            "expires_in must be a number or numeric string, got {other}"
+        ))),
+    }
 }
 
 /// Build the URL-encoded form body for a `client_credentials` exchange.
@@ -177,6 +205,23 @@ impl AgentforceAuth {
         }
 
         let body = build_form(&self.cfg.consumer_key, &self.cfg.consumer_secret);
+
+        // Full token endpoint we are about to call, reconstructed from the
+        // registered My Domain Service so the log shows exactly where the
+        // client_credentials exchange is dispatched.
+        let token_endpoint = format!(
+            "{}://{}{}",
+            self.my_domain.uri().scheme(),
+            self.my_domain.uri().authority(),
+            SALESFORCE_TOKEN_PATH
+        );
+        // Log only the non-sensitive endpoint. The OAuth client_id and
+        // client_secret are security:sensitive and must never be written to
+        // logs (nor at debug level - that's exactly when logs get captured).
+        logger::info!(
+            "agentforce-auth: requesting client_credentials token from '{token_endpoint}'"
+        );
+
         let request = client
             .request(self.my_domain.as_ref())
             .path(SALESFORCE_TOKEN_PATH)
@@ -188,21 +233,43 @@ impl AgentforceAuth {
             .timeout(Duration::from_secs(self.cfg.request_timeout_secs as u64))
             .post();
 
-        let response = request.await.map_err(|e| AuthError::Transport {
-            endpoint: "salesforce-oauth2",
-            source: anyhow::anyhow!(e.to_string()),
+        let response = request.await.map_err(|e| {
+            // Transport-level failure (DNS/TLS/connect/timeout): Salesforce
+            // returned no HTTP response, so log the raw client error and the
+            // endpoint we tried to reach.
+            let raw = e.to_string();
+            logger::info!(
+                "agentforce-auth: transport error calling token endpoint '{token_endpoint}': {raw}"
+            );
+            AuthError::Transport {
+                endpoint: "salesforce-oauth2",
+                source: anyhow::anyhow!(raw),
+            }
         })?;
 
         let status = response.status_code();
         if !(200..300).contains(&status) {
-            logger::error!(
-                "agentforce-auth: token endpoint returned HTTP {status}: {}",
+            logger::info!(
+                "agentforce-auth: token endpoint '{token_endpoint}' returned HTTP {status}; \
+                 raw Salesforce error body: {}",
                 String::from_utf8_lossy(response.body())
             );
             return Err(AuthError::HttpStatus { status });
         }
 
-        let parsed = parse_response(response.body())?;
+        let parsed = match parse_response(response.body()) {
+            Ok(p) => p,
+            Err(e) => {
+                // 2xx from Salesforce but the body was not a usable token
+                // response. The success body carries the access_token, so log
+                // only the parse error - never the raw body.
+                logger::info!(
+                    "agentforce-auth: token endpoint '{token_endpoint}' returned HTTP {status} \
+                     but the response could not be parsed: {e}"
+                );
+                return Err(e);
+            }
+        };
         let entry = CachedToken::new(parsed.access_token.clone(), now_unix, parsed.expires_in);
         if let Ok(bytes) = serde_json::to_vec(&entry) {
             // Best-effort: a cache miss next request just causes another exchange.
@@ -242,6 +309,21 @@ mod tests {
         let body = br#"{"access_token":"x"}"#;
         let r = parse_response(body).unwrap();
         assert_eq!(r.expires_in, DEFAULT_EXPIRES_IN_SECS);
+    }
+
+    #[test]
+    fn parse_response_accepts_string_expires_in() {
+        // JWT-format Salesforce token response quotes the numeric fields.
+        let body = br#"{"access_token":"00Dxxx","token_type":"Bearer","expires_in":"7200","issued_at":"1789156477762"}"#;
+        let r = parse_response(body).unwrap();
+        assert_eq!(r.expires_in, 7200);
+    }
+
+    #[test]
+    fn parse_response_rejects_non_numeric_string_expires_in() {
+        let body = br#"{"access_token":"00Dxxx","expires_in":"soon"}"#;
+        let err = parse_response(body).unwrap_err();
+        assert!(matches!(err, AuthError::BadJson(_)));
     }
 
     #[test]
